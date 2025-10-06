@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -28,7 +30,7 @@ interface GenerationStatus {
 
 export default function Home() {
   const { toast } = useToast();
-  
+
   // Form state
   const [mainPhoto, setMainPhoto] = useState<File | null>(null);
   const [prop1, setProp1] = useState<File | null>(null);
@@ -114,7 +116,7 @@ export default function Home() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
       toast({
         title: "Download Started",
         description: "Your image is being downloaded.",
@@ -177,9 +179,9 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <a 
-                href="https://ai.google.dev/gemini-api/docs/image-generation" 
-                target="_blank" 
+              <a
+                href="https://ai.google.dev/gemini-api/docs/image-generation"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="link-api-docs"
@@ -201,7 +203,7 @@ export default function Home() {
             Create <span className="gradient-text">AI-Powered</span> Image Variations
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-            Upload your photo and props, then watch Google's Nano Banana generate stunning variations with character consistency and multi-image blending.
+            Upload your photo and props, then watch Google&apos;s Nano Banana generate stunning variations with character consistency and multi-image blending.
           </p>
           <div className="flex items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2">
@@ -317,8 +319,8 @@ export default function Home() {
 
       {/* Loading State */}
       {isGenerating && (
-        <LoadingState 
-          progress={progress} 
+        <LoadingState
+          progress={progress}
           message="Processing images..."
         />
       )}
@@ -340,7 +342,7 @@ export default function Home() {
           <div className="text-center mb-12">
             <h3 className="text-3xl font-bold mb-4">How Nano Banana Works</h3>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Powered by Google DeepMind's Gemini 2.5 Flash Image, the world's top-rated image editing model
+              Powered by Google DeepMind&apos;s Gemini 2.5 Flash Image, the world&apos;s top-rated image editing model
             </p>
           </div>
 
@@ -410,10 +412,10 @@ export default function Home() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-8">
-              AI-powered image generation and editing using Google's Gemini 2.5 Flash Image.
+              AI-powered image generation and editing using Google&apos;s Gemini 2.5 Flash Image.
             </p>
             <p className="text-sm text-muted-foreground">
-              © 2025 Nano Banana. Powered by Google DeepMind's Gemini 2.5 Flash Image.
+              © 2025 Nano Banana. Powered by Google DeepMind&apos;s Gemini 2.5 Flash Image.
             </p>
           </div>
         </div>

@@ -1,8 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import { GoogleGenAI, Modality } from "@google/genai";
-import { storage } from "../storage";
-import { type ImageGeneration } from "@shared/schema";
+import { storage } from "./storage";
+import { type ImageGeneration } from "@/lib/shared/schema";
 
 // Initialize Gemini AI with API key
 const ai = new GoogleGenAI({ 
