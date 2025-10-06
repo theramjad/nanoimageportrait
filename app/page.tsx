@@ -13,19 +13,9 @@ import LoadingState from '@/components/loading-state';
 import ImageCarousel from '@/components/image-carousel';
 
 interface GenerationResponse {
-  id: string;
-  status: 'processing' | 'completed';
-  message: string;
-}
-
-interface GenerationStatus {
-  id: string;
-  status: 'processing' | 'completed';
-  prompt: string;
-  numVariations: number;
-  aspectRatio: string;
+  status: 'completed';
   generatedImages: string[];
-  createdAt: string;
+  message: string;
 }
 
 export default function Home() {
@@ -38,7 +28,7 @@ export default function Home() {
   const [prompt, setPrompt] = useState('Create an image of me holding both props in a sunny outdoor setting with professional photography lighting');
   const [numVariations, setNumVariations] = useState(5);
   const [aspectRatio, setAspectRatio] = useState('1:1');
-  const [generationId, setGenerationId] = useState<string | null>(null);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
 
   // Generate images mutation
   const generateMutation = useMutation({
@@ -47,30 +37,19 @@ export default function Home() {
       return response.json() as Promise<GenerationResponse>;
     },
     onSuccess: (data) => {
-      setGenerationId(data.id);
+      setGeneratedImages(data.generatedImages);
       toast({
-        title: "Generation Started",
-        description: "Your images are being generated. This may take 10-30 seconds.",
+        title: "Generation Complete!",
+        description: data.message,
       });
     },
     onError: (error) => {
       toast({
         title: "Generation Failed",
-        description: error instanceof Error ? error.message : "Failed to start image generation",
+        description: error instanceof Error ? error.message : "Failed to generate images",
         variant: "destructive",
       });
     },
-  });
-
-  // Poll generation status
-  const { data: generationStatus, isLoading: isPolling } = useQuery<GenerationStatus>({
-    queryKey: ['/api/generation', generationId],
-    enabled: !!generationId,
-    refetchInterval: (query) => {
-      // Stop polling when complete
-      return query.state.data?.status === 'completed' ? false : 2000;
-    },
-    refetchIntervalInBackground: true,
   });
 
   const handleGenerate = useCallback(async () => {
@@ -131,11 +110,11 @@ export default function Home() {
   }, [toast]);
 
   const handleDownloadAll = useCallback(async () => {
-    if (!generationStatus?.generatedImages.length) return;
+    if (!generatedImages.length) return;
 
     try {
-      for (let i = 0; i < generationStatus.generatedImages.length; i++) {
-        await handleDownload(generationStatus.generatedImages[i], `nano-banana-variation-${i + 1}.png`);
+      for (let i = 0; i < generatedImages.length; i++) {
+        await handleDownload(generatedImages[i], `nano-banana-variation-${i + 1}.png`);
         // Small delay between downloads
         await new Promise(resolve => setTimeout(resolve, 500));
       }
@@ -146,22 +125,37 @@ export default function Home() {
         variant: "destructive",
       });
     }
-  }, [generationStatus, handleDownload, toast]);
+  }, [generatedImages, handleDownload, toast]);
 
   const handleGenerateMore = useCallback(() => {
-    setGenerationId(null);
+    setGeneratedImages([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  const isGenerating = generateMutation.isPending || (generationId && generationStatus?.status === 'processing');
-  const isCompleted = generationStatus?.status === 'completed';
-  const generatedImages = generationStatus?.generatedImages.map((url, index) => ({
-    id: `${generationId}-${index}`,
-    url: `/api/images/${url}`,
-    createdAt: new Date(generationStatus.createdAt)
-  })) || [];
+  const isGenerating = generateMutation.isPending;
+  const isCompleted = generatedImages.length > 0;
+  const displayImages = generatedImages.map((url, index) => ({
+    id: `generated-${index}`,
+    url,
+    createdAt: new Date()
+  }));
 
-  const progress = isGenerating ? Math.min(90, Math.random() * 80 + 10) : 100;
+  const [progress, setProgress] = useState(0);
+
+  // Simulate progress during generation
+  React.useEffect(() => {
+    if (isGenerating) {
+      setProgress(10);
+      const interval = setInterval(() => {
+        setProgress(prev => Math.min(90, prev + Math.random() * 10));
+      }, 1000);
+      return () => clearInterval(interval);
+    } else if (isCompleted) {
+      setProgress(100);
+    } else {
+      setProgress(0);
+    }
+  }, [isGenerating, isCompleted]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -326,10 +320,10 @@ export default function Home() {
       )}
 
       {/* Results Gallery */}
-      {isCompleted && generatedImages.length > 0 && (
+      {isCompleted && displayImages.length > 0 && (
         <ImageCarousel
           originalImages={{ mainPhoto, prop1, prop2 }}
-          generatedImages={generatedImages}
+          generatedImages={displayImages}
           onDownload={handleDownload}
           onDownloadAll={handleDownloadAll}
           onGenerateMore={handleGenerateMore}

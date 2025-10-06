@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import path from 'path';
-import { storage } from '@/lib/server/storage';
-import { insertImageGenerationSchema } from '@/lib/shared/schema';
-import { generateImageVariations } from '@/lib/server/gemini';
+import { GoogleGenAI, Modality } from "@google/genai";
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // 5 minutes max
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || ""
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,50 +33,111 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 });
     }
 
-    // Save uploaded files
-    const uploadDir = path.join(process.cwd(), 'uploads');
+    // Prepare images for Gemini
+    const images: Array<{ inlineData: { data: string; mimeType: string } }> = [];
 
-    // Save main photo
+    // Main photo
     const mainPhotoBuffer = Buffer.from(await mainPhoto.arrayBuffer());
-    const mainPhotoPath = path.join(uploadDir, `main_${Date.now()}_${mainPhoto.name}`);
-    await writeFile(mainPhotoPath, mainPhotoBuffer);
+    images.push({
+      inlineData: {
+        data: mainPhotoBuffer.toString("base64"),
+        mimeType: mainPhoto.type,
+      },
+    });
 
-    // Save prop images if provided
-    let prop1Path: string | null = null;
-    let prop2Path: string | null = null;
-
+    // Prop images (optional)
     if (prop1 && prop1.type.startsWith('image/')) {
       const prop1Buffer = Buffer.from(await prop1.arrayBuffer());
-      prop1Path = path.join(uploadDir, `prop1_${Date.now()}_${prop1.name}`);
-      await writeFile(prop1Path, prop1Buffer);
+      images.push({
+        inlineData: {
+          data: prop1Buffer.toString("base64"),
+          mimeType: prop1.type,
+        },
+      });
     }
 
     if (prop2 && prop2.type.startsWith('image/')) {
       const prop2Buffer = Buffer.from(await prop2.arrayBuffer());
-      prop2Path = path.join(uploadDir, `prop2_${Date.now()}_${prop2.name}`);
-      await writeFile(prop2Path, prop2Buffer);
+      images.push({
+        inlineData: {
+          data: prop2Buffer.toString("base64"),
+          mimeType: prop2.type,
+        },
+      });
     }
 
-    // Validate request data
-    const validatedData = insertImageGenerationSchema.parse({
-      mainPhotoUrl: mainPhotoPath,
-      prop1Url: prop1Path,
-      prop2Url: prop2Path,
-      prompt: prompt.trim(),
-      numVariations,
-      aspectRatio,
-    });
+    // Generate images synchronously
+    const generatedImages: string[] = [];
 
-    // Create generation record
-    const generation = await storage.createImageGeneration(validatedData);
+    for (let i = 0; i < numVariations; i++) {
+      try {
+        console.log(`Generating variation ${i + 1}/${numVariations}`);
 
-    // Start image generation in background (don't await)
-    generateImageVariations(generation).catch(console.error);
+        // Enhance prompt with aspect ratio and variation details
+        let enhancedPrompt = prompt;
+        if (aspectRatio && aspectRatio !== "1:1") {
+          enhancedPrompt += ` in ${aspectRatio} aspect ratio`;
+        }
+        enhancedPrompt += `. Create a unique variation with creative lighting and composition.`;
+
+        // Prepare content for Gemini API
+        const contents = [
+          ...images,
+          { text: enhancedPrompt }
+        ];
+
+        // Call Gemini 2.0 Flash Preview Image Generation model
+        const response = await ai.models.generateContent({
+          model: "gemini-2.0-flash-preview-image-generation",
+          contents: [{ role: "user", parts: contents }],
+          config: {
+            responseModalities: [Modality.TEXT, Modality.IMAGE],
+          },
+        });
+
+        const candidates = response.candidates;
+        if (!candidates || candidates.length === 0) {
+          console.warn(`No candidates returned for variation ${i + 1}`);
+          continue;
+        }
+
+        const content = candidates[0].content;
+        if (!content || !content.parts) {
+          console.warn(`No content parts returned for variation ${i + 1}`);
+          continue;
+        }
+
+        // Process response parts
+        for (const part of content.parts) {
+          if (part.text) {
+            console.log(`Gemini response: ${part.text}`);
+          } else if (part.inlineData && part.inlineData.data) {
+            // Return image as base64 data URL
+            const base64Image = `data:image/png;base64,${part.inlineData.data}`;
+            generatedImages.push(base64Image);
+            console.log(`Generated image ${i + 1}`);
+            break;
+          }
+        }
+
+        // Small delay between generations to avoid rate limiting
+        if (i < numVariations - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+      } catch (variationError) {
+        console.error(`Error generating variation ${i + 1}:`, variationError);
+      }
+    }
+
+    if (generatedImages.length === 0) {
+      throw new Error("No images were generated successfully");
+    }
 
     return NextResponse.json({
-      id: generation.id,
-      status: "processing",
-      message: "Image generation started"
+      status: "completed",
+      generatedImages,
+      message: `Successfully generated ${generatedImages.length} variations`
     });
 
   } catch (error) {
