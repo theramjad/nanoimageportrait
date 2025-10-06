@@ -64,9 +64,9 @@ export default function Home() {
   const { data: generationStatus, isLoading: isPolling } = useQuery<GenerationStatus>({
     queryKey: ['/api/generation', generationId],
     enabled: !!generationId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Stop polling when complete
-      return data?.status === 'completed' ? false : 2000;
+      return query.state.data?.status === 'completed' ? false : 2000;
     },
     refetchIntervalInBackground: true,
   });

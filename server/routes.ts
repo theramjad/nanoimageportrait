@@ -17,7 +17,7 @@ const upload = multer({
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'), false);
+      cb(new Error('Only image files are allowed'));
     }
   }
 });
@@ -83,7 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Generation not found" });
       }
 
-      const isComplete = generation.generatedImages.length > 0;
+      const isComplete = generation.generatedImages && generation.generatedImages.length > 0;
       
       res.json({
         id: generation.id,
